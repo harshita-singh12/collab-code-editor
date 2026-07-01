@@ -1,0 +1,27 @@
+{
+  "name": "collab-code-editor",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Real-time collaborative code editor (Yjs CRDT + Socket.io + Monaco)",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client",
+    "packages/ot-demo"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/ot-demo && npm run build --workspace=packages/client",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:server": "npm run dev --workspace=packages/server",
+    "dev:client": "npm run dev --workspace=packages/client",
+    "convergence-demo": "npm run convergence-demo --workspace=packages/server"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
