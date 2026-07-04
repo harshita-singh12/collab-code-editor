@@ -1,0 +1,51 @@
+# Example nginx config for running multiple server instances behind a load
+# balancer -- see DESIGN.md "Scaling: Redis pub/sub + sticky sessions" for
+# why sticky sessions are required (Socket.io's handshake, and especially
+# its long-polling fallback transport, needs every packet for one logical
+# connection to land on the same backend process).
+#
+# This repo's docker-compose.yml runs a single server instance, so sticky
+# sessions aren't exercised there -- this file is a reference for anyone
+# scaling the `server` service to N replicas behind a real load balancer.
+# Not wired into docker-compose.yml on purpose (would need a real LB
+# service + multiple named server replicas, out of scope for local dev).
+
+upstream collab_backend {
+    # ip_hash pins a given client IP to the same upstream server for the
+    # life of the hash table, which is sufficient for Socket.io's needs.
+    # A cookie-based affinity (e.g. nginx's sticky module, or an ALB's
+    # target-group stickiness) is a better choice than ip_hash behind NAT
+    # or a corporate proxy where many clients share one IP -- ip_hash is
+    # used here purely because it needs no extra nginx modules.
+    ip_hash;
+
+    server collab-server-1:4000;
+    server collab-server-2:4000;
+    server collab-server-3:4000;
+}
+
+server {
+    listen 80;
+    server_name collab.example.com;
+
+    location /socket.io/ {
+        proxy_pass http://collab_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Socket.io pings every 25s by default; keep the proxy timeout
+        # comfortably above that so idle-but-alive connections aren't
+        # dropped by nginx.
+        proxy_read_timeout 60s;
+    }
+
+    location /api/ {
+        proxy_pass http://collab_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}

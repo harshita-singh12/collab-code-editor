@@ -1,0 +1,19 @@
+{
+  "name": "@collab/ot-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone from-scratch Operational Transformation engine for plain-text insert/delete, kept separate from the main app -- see COMPARISON.md for how this compares to the Yjs CRDT approach used everywhere else in this repo.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "demo": "tsx src/demo.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
