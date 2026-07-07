@@ -19,10 +19,14 @@ export type ConnectionStatus = "connecting" | "connected" | "disconnected";
  * same handshake `y-websocket` implements (writeSyncStep1 on connect, then
  * peer-symmetric readSyncMessage for everything after), just carried over
  * Socket.io events instead of a raw `ws` socket, and joined to a specific
- * document "room" with a server-authorized role. See DESIGN.md "Transport
- * protocol" for the full write-up of why we hand-roll this thin transport
- * layer but reuse Yjs's own protocol encoders (`y-protocols/sync`,
- * `y-protocols/awareness`) rather than reinventing the wire format.
+ * document "room" with a server-authorized role. We deliberately do not
+ * pull in `y-websocket` (assumes a raw `ws` socket) or the third-party
+ * `y-socket.io` package (small, sparsely maintained); instead this reuses
+ * Yjs's own published wire-protocol encoders (`y-protocols/sync`,
+ * `y-protocols/awareness`) and only supplies the Socket.io transport glue.
+ * This is always-on and is what persists documents to Postgres and
+ * enforces access control; see `webrtcTransport.ts` for the optional,
+ * additive peer-to-peer transport layered on top of the same Y.Doc.
  */
 export class SocketIOProvider extends Observable<string> {
   readonly doc: Y.Doc;

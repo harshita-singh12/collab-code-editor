@@ -5,9 +5,9 @@ import { requireAuth } from "../auth/middleware";
 export const usersRouter = Router();
 
 /** Lets a document owner find a user by display name to grant them access.
- * Scoped to requireAuth just so this isn't a fully open user enumeration
- * endpoint; still a coarse search since there's no real account privacy
- * model in this project (see DESIGN.md "Authentication"). */
+ * Scoped to requireAuth just so this isn't a fully open, unauthenticated
+ * user enumeration endpoint; it still only searches display names, never
+ * emails, to avoid leaking account emails through the share dialog. */
 usersRouter.get("/", requireAuth, async (req, res) => {
   const query = String(req.query.q ?? "").trim();
   if (query.length < 2) {

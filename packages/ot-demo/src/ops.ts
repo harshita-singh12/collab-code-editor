@@ -35,7 +35,7 @@ export function applyAll(doc: string, ops: Op[]): string {
  * priority (e.g. lower site id); this mirrors the tie-break every OT
  * implementation needs (Jupiter/Google Wave use a similar site-id/priority
  * rule) and is directly analogous to how Yjs's YATA algorithm breaks ties
- * on clientID -- see DESIGN.md #1. */
+ * on clientID in the CRDT used by the rest of this repo. */
 export type Priority = "left" | "right";
 
 /**

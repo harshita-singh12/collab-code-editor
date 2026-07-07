@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
 /**
- * Unit-level proof of the CRDT merge property described in DESIGN.md #1,
- * exercised directly against Yjs with no network involved: multiple
+ * Unit-level proof of Yjs's CRDT merge property (see README.md "Why Yjs's
+ * built-in causality tracking"), exercised directly against Yjs with no
+ * network involved: multiple
  * independent Y.Doc replicas, fed the same set of updates in different
  * orders (including duplicates and out-of-order delivery), must converge
  * to byte-identical text.

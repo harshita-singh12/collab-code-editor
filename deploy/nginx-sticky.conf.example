@@ -1,8 +1,9 @@
 # Example nginx config for running multiple server instances behind a load
-# balancer -- see DESIGN.md "Scaling: Redis pub/sub + sticky sessions" for
-# why sticky sessions are required (Socket.io's handshake, and especially
-# its long-polling fallback transport, needs every packet for one logical
-# connection to land on the same backend process).
+# balancer. Sticky sessions are required because Socket.io's handshake, and
+# especially its long-polling fallback transport, needs every packet for
+# one logical connection to land on the same backend process -- see
+# README.md "Scaling" for the full write-up of why this repo hand-rolls
+# Redis pub/sub fan-out instead of relying on the load balancer alone.
 #
 # This repo's docker-compose.yml runs a single server instance, so sticky
 # sessions aren't exercised there -- this file is a reference for anyone

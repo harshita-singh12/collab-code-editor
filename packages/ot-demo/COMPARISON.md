@@ -44,8 +44,8 @@ tabs, a server and an offline laptop reconnecting a week later — can
 guaranteed to converge, with no coordinator. That's precisely what let
 `packages/server`'s room manager (`src/rooms/roomManager.ts`) treat every
 server instance as just another replica connected via Redis pub/sub
-(see `DESIGN.md` "Scaling"), instead of needing to elect one instance as
-the sequencer for each document.
+(see the main `README.md` "Scaling" section), instead of needing to elect
+one instance as the sequencer for each document.
 
 **Every op-pair-type combination needs its own hand-proven transform
 function.** `transformDeleteInsert` in `src/ops.ts` has to explicitly
@@ -70,14 +70,14 @@ substantial additional machinery on top of everything in `src/ops.ts`.
 Yjs's client story, in contrast, is "apply local edits to your `Y.Doc`
 whenever you want, in any order, online or offline" — `packages/client`'s
 `SocketIOProvider` (`src/yjs/SocketIOProvider.ts`) has no equivalent
-reconciliation code at all; §"Offline editing" in `DESIGN.md` covers why
-that's inherent to the CRDT model rather than something we happened not
-to need.
+reconciliation code at all; that's inherent to the CRDT model (any replica
+can `applyUpdate` any other replica's changes in any order and converge)
+rather than something we happened not to need.
 
 **Metadata / storage.** Because Yjs tracks per-character identity, deleted
 content becomes a tombstone until it's provably safe to garbage-collect
-(handled automatically by `gc: true`, see `DESIGN.md` "Tombstone
-compaction"). OT ops carry no such long-lived metadata — once transformed
+(handled automatically by `gc: true`, Yjs's default). OT ops carry no such
+long-lived metadata — once transformed
 and applied, an op is just gone — but that's only affordable *because* the
 central server's op log is the source of truth; a client that was offline
 for a long time can't just "catch up" the way a CRDT replica can (see

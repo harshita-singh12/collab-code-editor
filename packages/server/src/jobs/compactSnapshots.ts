@@ -3,9 +3,9 @@ import { pruneSnapshots } from "../db/snapshotsRepo";
 
 /**
  * Tombstone/metadata compaction for the *version history* table (the live
- * editing Y.Doc's own tombstone GC is automatic via Yjs's gc:true -- see
- * DESIGN.md). Run on a schedule (cron/k8s CronJob in production; invoked
- * manually here via `npm run compact-snapshots`).
+ * editing Y.Doc's own tombstone GC is automatic via Yjs's gc:true, so it
+ * needs no code here). Run on a schedule (cron/k8s CronJob in production;
+ * invoked manually here via `npm run compact-snapshots`).
  */
 async function run() {
   const { rows } = await pool.query<{ id: string }>("SELECT id FROM documents");

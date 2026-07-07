@@ -42,7 +42,8 @@ interface Room {
 /**
  * Owns one authoritative in-memory Y.Doc + Awareness instance per actively
  * used document ("room"), and is the single place that:
- *  - loads/persists document state to Postgres (debounced, see DESIGN.md #2)
+ *  - loads/persists document state to Postgres (debounced -- writes the
+ *    merged current state, not an update log, see README.md "Stack")
  *  - fans out updates to locally-connected sockets
  *  - fans out updates to other server instances via Redis pub/sub
  *  - drops writes from viewer-role sockets (the actual access-control
@@ -52,7 +53,7 @@ class RoomManager {
   private rooms = new Map<string, Room>();
 
   private async createRoom(docId: string): Promise<Room> {
-    const doc = new Y.Doc(); // gc: true (Yjs default) -- see DESIGN.md tombstone compaction
+    const doc = new Y.Doc(); // gc: true (Yjs default) -- automatic tombstone compaction
     const docRow = await getDocumentById(docId);
     if (docRow?.state && docRow.state.byteLength > 0) {
       Y.applyUpdate(doc, docRow.state, INIT_ORIGIN);
@@ -129,8 +130,8 @@ class RoomManager {
   }
 
   /** Client joined the room's socket channel. Sends our state vector so
-   * the two-way Yjs sync handshake (see DESIGN.md) can begin, plus a
-   * snapshot of current presence. */
+   * the two-way Yjs sync handshake can begin, plus a snapshot of current
+   * presence. */
   async join(docId: string, socket: Socket, role: EffectiveRole): Promise<number> {
     const room = await this.getOrLoad(docId);
     room.sockets.set(socket.id, { socket, role });
@@ -352,9 +353,8 @@ class RoomManager {
 
   /** Restores a historical version by diffing the live doc's current text
    * against the target text and applying the diff as ordinary Y.Text
-   * operations inside one transaction -- see DESIGN.md "Version history &
-   * diffing". This merges causally with concurrent edits instead of
-   * clobbering the document wholesale. */
+   * operations inside one transaction. This merges causally with
+   * concurrent edits instead of clobbering the document wholesale. */
   async restoreToText(docId: string, targetText: string, userId: string): Promise<void> {
     const room = await this.getOrLoad(docId);
     const ytext = room.doc.getText(CONTENT_KEY);

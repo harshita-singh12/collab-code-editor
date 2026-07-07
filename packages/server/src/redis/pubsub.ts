@@ -10,9 +10,12 @@ const AWARENESS_PREFIX = "room-awareness:";
  * publishing, one dedicated to subscribing -- ioredis requires a separate
  * connection once a client enters subscribe mode). This is the mechanism
  * that lets multiple server instances fan out both document updates and
- * presence to each other -- see DESIGN.md "Scaling: Redis pub/sub and
- * sticky sessions" for why this is hand-rolled here instead of using
- * @socket.io/redis-adapter.
+ * presence to each other. Deliberately hand-rolled here instead of using
+ * @socket.io/redis-adapter: the adapter only solves client-facing Socket.io
+ * room fan-out across instances, but each instance still needs its own
+ * authoritative Y.Doc replica (used for persistence and for late-joining
+ * clients) kept up to date, which requires this pub/sub loop regardless --
+ * running both would be two overlapping broadcast systems.
  *
  * Binary Yjs update bytes are sent as Redis message payloads directly
  * (ioredis supports Buffer messages when using `publish`/`on("messageBuffer")`).

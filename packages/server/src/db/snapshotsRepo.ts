@@ -81,7 +81,8 @@ export async function getSnapshotBefore(
 }
 
 /** Compaction / GC: prune old snapshot rows per a keep-more-recent,
- * thin-out-older retention policy. See DESIGN.md "Tombstone compaction". */
+ * thin-out-older retention policy (see `pruneSnapshots` below for the
+ * bucketing rules). */
 export async function pruneSnapshots(documentId: string): Promise<number> {
   const res = await pool.query<{ id: string; created_at: Date; label: string | null }>(
     `SELECT id, created_at, label FROM document_snapshots

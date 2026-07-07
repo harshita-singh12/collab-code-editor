@@ -51,7 +51,7 @@ export function Editor({ doc, awareness, undoManager, language, role }: EditorPr
 
     // Route undo/redo through the CRDT's UndoManager (scoped to local-origin
     // transactions only) instead of Monaco's own undo stack, so Ctrl+Z never
-    // undoes a remote collaborator's concurrent edit. See DESIGN.md "Undo/redo".
+    // undoes a remote collaborator's concurrent edit.
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ, () => {
       undoManager.undo();
     });
