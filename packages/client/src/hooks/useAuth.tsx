@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { UserDTO } from "@collab/shared";
+import type { AuthResponse, UserDTO } from "@collab/shared";
 import { api, setAuthToken } from "../api/client";
 
-const STORAGE_CLIENT_ID = "collab.clientId";
 const STORAGE_TOKEN = "collab.token";
 const STORAGE_USER = "collab.user";
 
@@ -10,20 +9,12 @@ interface AuthContextValue {
   user: UserDTO | null;
   token: string | null;
   ready: boolean;
-  login: (displayName: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function getOrCreateClientId(): string {
-  let id = localStorage.getItem(STORAGE_CLIENT_ID);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(STORAGE_CLIENT_ID, id);
-  }
-  return id;
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserDTO | null>(null);
@@ -41,15 +32,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setReady(true);
   }, []);
 
-  const login = useCallback(async (displayName: string) => {
-    const clientId = getOrCreateClientId();
-    const response = await api.createSession({ displayName, clientId });
+  const persist = useCallback((response: AuthResponse) => {
     setToken(response.token);
     setUser(response.user);
     setAuthToken(response.token);
     localStorage.setItem(STORAGE_TOKEN, response.token);
     localStorage.setItem(STORAGE_USER, JSON.stringify(response.user));
   }, []);
+
+  const signup = useCallback(
+    async (email: string, password: string, displayName: string) => {
+      const response = await api.signup({ email, password, displayName });
+      persist(response);
+    },
+    [persist]
+  );
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const response = await api.login({ email, password });
+      persist(response);
+    },
+    [persist]
+  );
 
   const logout = useCallback(() => {
     setToken(null);
@@ -60,8 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, ready, login, logout }),
-    [user, token, ready, login, logout]
+    () => ({ user, token, ready, signup, login, logout }),
+    [user, token, ready, signup, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,9 +1,10 @@
 import type {
-  AuthSessionRequest,
-  AuthSessionResponse,
+  AuthResponse,
   CreateDocumentRequest,
   DocumentDetailDTO,
   DocumentSummaryDTO,
+  LoginRequest,
+  SignupRequest,
   UpdateLinkAccessRequest,
   UpdatePermissionRequest,
   VersionDiffDTO,
@@ -41,8 +42,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  createSession: (body: AuthSessionRequest) =>
-    request<AuthSessionResponse>("/api/auth/session", {
+  signup: (body: SignupRequest) =>
+    request<AuthResponse>("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  login: (body: LoginRequest) =>
+    request<AuthResponse>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(body),
     }),
