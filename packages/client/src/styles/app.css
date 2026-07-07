@@ -164,6 +164,21 @@ select {
   border: 1px solid var(--border);
 }
 
+.webrtc-toggle {
+  border-radius: 10px;
+  padding: 3px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim, #90a4ae);
+  cursor: pointer;
+}
+
+.webrtc-toggle.webrtc-on {
+  color: #81c784;
+  border-color: #81c784;
+}
+
 .role-owner {
   color: #ffd54f;
 }

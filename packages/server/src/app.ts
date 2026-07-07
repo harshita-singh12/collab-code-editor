@@ -9,6 +9,7 @@ import { documentsRouter } from "./routes/documents";
 import { versionsRouter } from "./routes/versions";
 import { usersRouter } from "./routes/users";
 import { registerSocketHandlers } from "./socket";
+import { attachWebrtcSignaling } from "./webrtc/signalingServer";
 
 export function createApp(): { app: express.Express; httpServer: HttpServer; io: SocketIOServer } {
   const app = express();
@@ -28,6 +29,7 @@ export function createApp(): { app: express.Express; httpServer: HttpServer; io:
     maxHttpBufferSize: 10 * 1024 * 1024,
   });
   registerSocketHandlers(io);
+  attachWebrtcSignaling(httpServer);
 
   return { app, httpServer, io };
 }

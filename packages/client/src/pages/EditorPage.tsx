@@ -69,6 +69,15 @@ export function EditorPage() {
         <StatusBadge status={handle.status} synced={handle.synced} />
         <div className="topbar-right">
           <PresenceBar awareness={handle.provider.awareness} selfClientId={handle.doc?.clientID ?? null} />
+          <button
+            className={handle.webrtcEnabled ? "webrtc-toggle webrtc-on" : "webrtc-toggle"}
+            onClick={handle.toggleWebrtc}
+            title="Peer-to-peer sync via WebRTC, in addition to the always-on server relay"
+          >
+            {handle.webrtcEnabled
+              ? `P2P: on (${handle.webrtcPeerCount} peer${handle.webrtcPeerCount === 1 ? "" : "s"})`
+              : "P2P: off"}
+          </button>
           <button onClick={() => setShowHistory(true)}>History</button>
           {canManageAccess(handle.role) && (
             <button onClick={() => setShowShare(true)}>Share</button>
