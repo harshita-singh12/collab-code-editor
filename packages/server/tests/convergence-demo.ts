@@ -13,7 +13,7 @@
  */
 import type { AddressInfo } from "net";
 import { createApp } from "../src/app";
-import { findOrCreateUser } from "../src/db/usersRepo";
+import { createTestUser } from "./testUsers";
 import { createDocument } from "../src/db/documentsRepo";
 import { signToken } from "../src/auth/jwt";
 import { redisBus } from "../src/redis/pubsub";
@@ -35,7 +35,7 @@ async function main() {
   const baseUrl = `http://localhost:${port}`;
   log(`[demo] server listening on ${baseUrl}\n`);
 
-  const owner = await findOrCreateUser(`demo-${Date.now()}`, "Demo Owner");
+  const owner = await createTestUser(`demo-${Date.now()}`, "Demo Owner");
   const doc = await createDocument("Convergence Demo Doc", owner.id, "javascript");
   const token = signToken({ sub: owner.id, displayName: "Demo Owner" });
   log(`[demo] created document ${doc.id}\n`);

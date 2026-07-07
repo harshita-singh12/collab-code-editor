@@ -5,7 +5,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id     TEXT UNIQUE NOT NULL,
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
   display_name  TEXT NOT NULL,
   color         TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -18,7 +19,7 @@ CREATE TABLE IF NOT EXISTS documents (
   link_access   TEXT NOT NULL DEFAULT 'viewer' CHECK (link_access IN ('none', 'viewer', 'editor')),
   language      TEXT NOT NULL DEFAULT 'javascript',
   -- Latest merged Yjs state (Y.encodeStateAsUpdate output). O(doc size),
-  -- never an operation log -- see DESIGN.md #2.
+  -- never an operation log (see README.md "Stack" for why).
   state         BYTEA,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()

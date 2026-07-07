@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { resetDb, closeDb } from "./testDb";
 import { createDocument, getDocumentById, updateDocumentState } from "../src/db/documentsRepo";
-import { findOrCreateUser } from "../src/db/usersRepo";
+import { createTestUser } from "./testUsers";
 import {
   getSnapshot,
   getSnapshotBefore,
@@ -23,7 +23,7 @@ describe("snapshot persistence", () => {
   });
 
   it("persists and reloads the current merged Yjs state as a single update (no operation log replay)", async () => {
-    const user = await findOrCreateUser("client-1", "Alice");
+    const user = await createTestUser("client-1", "Alice");
     const doc = await createDocument("Test Doc", user.id, "javascript");
 
     const ydoc = new Y.Doc();
@@ -47,7 +47,7 @@ describe("snapshot persistence", () => {
   });
 
   it("assigns monotonically increasing sequence numbers per document", async () => {
-    const user = await findOrCreateUser("client-2", "Bob");
+    const user = await createTestUser("client-2", "Bob");
     const doc = await createDocument("Seq Doc", user.id, "javascript");
 
     expect(await nextSeq(doc.id)).toBe(1);
@@ -73,7 +73,7 @@ describe("snapshot persistence", () => {
   });
 
   it("getSnapshotBefore returns the immediately preceding version for diffing", async () => {
-    const user = await findOrCreateUser("client-3", "Carol");
+    const user = await createTestUser("client-3", "Carol");
     const doc = await createDocument("Diff Doc", user.id, "javascript");
 
     const s1 = await insertSnapshot({
@@ -102,7 +102,7 @@ describe("snapshot persistence", () => {
   });
 
   it("prunes old, unlabeled snapshots per the retention policy but keeps labeled checkpoints and the latest", async () => {
-    const user = await findOrCreateUser("client-4", "Dave");
+    const user = await createTestUser("client-4", "Dave");
     const doc = await createDocument("Prune Doc", user.id, "javascript");
 
     // Insert several snapshots and backdate their created_at so the

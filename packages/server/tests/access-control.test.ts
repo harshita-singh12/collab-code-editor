@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { resetDb, closeDb } from "./testDb";
 import { createApp } from "../src/app";
-import { findOrCreateUser } from "../src/db/usersRepo";
+import { createTestUser } from "./testUsers";
 import { createDocument, updateLinkAccess } from "../src/db/documentsRepo";
 import { upsertPermission } from "../src/db/permissionsRepo";
 import { resolveEffectiveRole, requireAtLeast } from "../src/auth/accessControl";
@@ -21,7 +21,7 @@ describe("access control", () => {
 
   describe("resolveEffectiveRole (unit)", () => {
     it("owner always resolves to owner regardless of link access", async () => {
-      const owner = await findOrCreateUser("u-owner", "Owner");
+      const owner = await createTestUser("u-owner", "Owner");
       const doc = await createDocument("Doc", owner.id, "javascript");
       await updateLinkAccess(doc.id, "none");
       const updated = { ...doc, link_access: "none" as const };
@@ -29,8 +29,8 @@ describe("access control", () => {
     });
 
     it("explicit permission grant overrides link access default", async () => {
-      const owner = await findOrCreateUser("u-owner2", "Owner");
-      const other = await findOrCreateUser("u-other", "Other");
+      const owner = await createTestUser("u-owner2", "Owner");
+      const other = await createTestUser("u-other", "Other");
       const doc = await createDocument("Doc", owner.id, "javascript");
       await updateLinkAccess(doc.id, "none");
       await upsertPermission(doc.id, other.id, "editor");
@@ -39,8 +39,8 @@ describe("access control", () => {
     });
 
     it("falls back to link access for a user with no explicit grant", async () => {
-      const owner = await findOrCreateUser("u-owner3", "Owner");
-      const stranger = await findOrCreateUser("u-stranger", "Stranger");
+      const owner = await createTestUser("u-owner3", "Owner");
+      const stranger = await createTestUser("u-stranger", "Stranger");
       const doc = await createDocument("Doc", owner.id, "javascript");
       await updateLinkAccess(doc.id, "viewer");
       const updated = { ...doc, link_access: "viewer" as const };
@@ -48,7 +48,7 @@ describe("access control", () => {
     });
 
     it("anonymous (no user) gets link access role or none", async () => {
-      const owner = await findOrCreateUser("u-owner4", "Owner");
+      const owner = await createTestUser("u-owner4", "Owner");
       const doc = await createDocument("Doc", owner.id, "javascript");
       await updateLinkAccess(doc.id, "editor");
       const updated = { ...doc, link_access: "editor" as const };
@@ -75,8 +75,8 @@ describe("access control", () => {
 
     it("denies access to a document with no permission and link_access=none", async () => {
       const { app } = createApp();
-      const owner = await findOrCreateUser("u-a", "Owner");
-      const stranger = await findOrCreateUser("u-b", "Stranger");
+      const owner = await createTestUser("u-a", "Owner");
+      const stranger = await createTestUser("u-b", "Stranger");
       const doc = await createDocument("Private Doc", owner.id, "javascript");
       await updateLinkAccess(doc.id, "none");
 
@@ -89,8 +89,8 @@ describe("access control", () => {
 
     it("allows viewer access via link_access without an explicit grant, but blocks link-access changes", async () => {
       const { app } = createApp();
-      const owner = await findOrCreateUser("u-c", "Owner");
-      const stranger = await findOrCreateUser("u-d", "Stranger");
+      const owner = await createTestUser("u-c", "Owner");
+      const stranger = await createTestUser("u-d", "Stranger");
       const doc = await createDocument("Link Viewable Doc", owner.id, "javascript");
       await updateLinkAccess(doc.id, "viewer");
 
@@ -110,8 +110,8 @@ describe("access control", () => {
 
     it("only the owner can change link access or grant permissions", async () => {
       const { app } = createApp();
-      const owner = await findOrCreateUser("u-e", "Owner");
-      const editor = await findOrCreateUser("u-f", "Editor");
+      const owner = await createTestUser("u-e", "Owner");
+      const editor = await createTestUser("u-f", "Editor");
       const doc = await createDocument("Owner Only Doc", owner.id, "javascript");
       await upsertPermission(doc.id, editor.id, "editor");
 
@@ -126,7 +126,7 @@ describe("access control", () => {
         .expect(403);
 
       // Owner can.
-      const stranger = await findOrCreateUser("u-g", "Stranger");
+      const stranger = await createTestUser("u-g", "Stranger");
       await request(app)
         .put(`/api/documents/${doc.id}/permissions`)
         .set("Authorization", `Bearer ${ownerToken}`)
@@ -136,8 +136,8 @@ describe("access control", () => {
 
     it("only the owner can delete a document", async () => {
       const { app } = createApp();
-      const owner = await findOrCreateUser("u-h", "Owner");
-      const editor = await findOrCreateUser("u-i", "Editor");
+      const owner = await createTestUser("u-h", "Owner");
+      const editor = await createTestUser("u-i", "Editor");
       const doc = await createDocument("Deletable Doc", owner.id, "javascript");
       await upsertPermission(doc.id, editor.id, "editor");
 

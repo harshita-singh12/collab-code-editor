@@ -102,15 +102,18 @@ export interface VersionDiffDTO {
   toText: string;
 }
 
-export interface AuthSessionRequest {
+export interface SignupRequest {
+  email: string;
+  password: string;
   displayName: string;
-  /** Client-generated persistent identity id (stored in localStorage), so
-   * repeat visits from the same browser reuse the same user row. If
-   * omitted, a new user is created. */
-  clientId?: string;
 }
 
-export interface AuthSessionResponse {
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
   token: string;
   user: UserDTO;
 }

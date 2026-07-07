@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { AddressInfo } from "net";
 import { createApp } from "../src/app";
 import { resetDb, closeDb } from "./testDb";
-import { findOrCreateUser } from "../src/db/usersRepo";
+import { createTestUser } from "./testUsers";
 import { createDocument } from "../src/db/documentsRepo";
 import { signToken } from "../src/auth/jwt";
 import { redisBus } from "../src/redis/pubsub";
@@ -47,7 +47,7 @@ describe("convergence under network partition (e2e, real Socket.io)", () => {
   });
 
   async function makeDocument(title = "Convergence Test Doc") {
-    const owner = await findOrCreateUser("owner-client", "Owner");
+    const owner = await createTestUser("owner-client", "Owner");
     const doc = await createDocument(title, owner.id, "javascript");
     const token = signToken({ sub: owner.id, displayName: "Owner" });
     return { doc, token };
