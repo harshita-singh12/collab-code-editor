@@ -112,6 +112,15 @@ uptime. The signaling server only relays opaque payloads between
 subscribers of the same room topic -- it never inspects document content,
 which either flows directly between peers' `RTCPeerConnection`s or, for
 everyone not currently WebRTC-connected, over the always-on Socket.io path.
+A valid JWT alone only proves *some* account is connecting, not that the
+account may see this particular document, and because WebRTC sync traffic
+flows directly between peers once connected (bypassing the server, and
+therefore bypassing `roomManager.ts`'s enforcement), the signaling server
+also re-resolves `resolveEffectiveRole` per topic on `subscribe` (a topic
+is `collab-doc-<docId>`) and silently drops a subscribe request for a
+document the caller can't read -- the same owner/editor/viewer check the
+Socket.io join handler makes, applied here too so the P2P path can't be
+used to read a document the always-on path would refuse.
 
 Because a direct peer connection depends on things outside this app's
 control (NAT/firewall traversal, whether another collaborator is online
@@ -330,9 +339,11 @@ What's covered (`packages/server/tests/`):
   (401/403s) via `supertest` against the real Express app.
 - `webrtc-signaling.test.ts` -- real `ws` WebSocket connections against
   the self-hosted WebRTC signaling server: auth gating (missing/invalid
-  token rejected before the upgrade completes), publish fan-out to a
-  topic's subscribers, isolation between unrelated rooms, unsubscribe, and
-  ping/pong keepalive.
+  token rejected before the upgrade completes), per-document access control
+  on `subscribe` (an authenticated user with no permission on a document
+  gets no fan-out for its topic, even though their JWT is otherwise valid),
+  publish fan-out to a topic's subscribers, isolation between unrelated
+  rooms, unsubscribe, and ping/pong keepalive.
 - `convergence.e2e.test.ts` -- **the main "prove it converges" suite**, see below.
 
 `packages/ot-demo/tests/` covers the OT engine's transform correctness

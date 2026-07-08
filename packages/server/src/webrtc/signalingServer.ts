@@ -2,14 +2,33 @@ import type { IncomingMessage, Server as HttpServer } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 import { env } from "../util/env";
 import { verifyToken } from "../auth/jwt";
+import { getDocumentById } from "../db/documentsRepo";
+import { resolveEffectiveRole } from "../auth/accessControl";
 
 export const WEBRTC_SIGNALING_PATH = "/webrtc-signaling";
 
 const PING_TIMEOUT_MS = 30000;
 
+// Matches the topic name the client builds in
+// `packages/client/src/yjs/webrtcTransport.ts` (`collab-doc-${docId}`).
+const TOPIC_PREFIX = "collab-doc-";
+
 interface SignalingSocket extends WebSocket {
   subscribedTopics?: Set<string>;
   pongReceived?: boolean;
+  userId?: string;
+}
+
+/** Mirrors the Socket.io join-room check (`resolveEffectiveRole` !==
+ * "none") for a WebRTC signaling topic. A topic outside our own naming
+ * scheme is denied by default rather than allowed through. */
+async function canSubscribe(userId: string, topic: string): Promise<boolean> {
+  if (!topic.startsWith(TOPIC_PREFIX)) return false;
+  const docId = topic.slice(TOPIC_PREFIX.length);
+  const doc = await getDocumentById(docId);
+  if (!doc) return false;
+  const role = await resolveEffectiveRole(doc, userId);
+  return role !== "none";
 }
 
 interface SignalingMessage {
@@ -59,7 +78,17 @@ function send(conn: SignalingSocket, message: SignalingMessage): void {
  * Postgres). Connections must present a valid JWT (the same one used for
  * REST/Socket.io auth) as a `?token=` query param, so this endpoint can't
  * be used by an unauthenticated client to discover which document rooms
- * are currently active.
+ * are currently active. Being logged in only proves *some* identity though
+ * -- it says nothing about whether that user may see any given document,
+ * and because a WebRTC peer connection carries the actual Yjs sync traffic
+ * directly between browsers once established (bypassing the server
+ * entirely), letting any authenticated user subscribe to any topic would
+ * let them pull down a private document's content over WebRTC despite
+ * failing `resolveEffectiveRole` on the Socket.io/REST path. So `subscribe`
+ * re-checks that same effective-role resolution per topic (`canSubscribe`
+ * below), keyed off the `collab-doc-<docId>` topic naming convention the
+ * client uses -- a request to join a topic for a document the caller can't
+ * read is silently dropped rather than subscribed.
  */
 export function attachWebrtcSignaling(httpServer: HttpServer): void {
   const wss = new WebSocketServer({ noServer: true });
@@ -80,14 +109,16 @@ export function attachWebrtcSignaling(httpServer: HttpServer): void {
       socket.destroy();
       return;
     }
+    let userId: string;
     try {
-      verifyToken(token);
+      userId = verifyToken(token).sub;
     } catch {
       socket.destroy();
       return;
     }
 
     wss.handleUpgrade(req, socket, head, (ws) => {
+      (ws as SignalingSocket).userId = userId;
       wss.emit("connection", ws, req);
     });
   });
@@ -141,15 +172,22 @@ export function attachWebrtcSignaling(httpServer: HttpServer): void {
       switch (message.type) {
         case "subscribe": {
           const requested = Array.isArray(message.topics) ? message.topics : [];
+          const userId = conn.userId;
+          if (!userId) break;
           for (const topicName of requested) {
             if (typeof topicName !== "string") continue;
-            let subs = topics.get(topicName);
-            if (!subs) {
-              subs = new Set();
-              topics.set(topicName, subs);
-            }
-            subs.add(conn);
-            conn.subscribedTopics?.add(topicName);
+            canSubscribe(userId, topicName)
+              .then((allowed) => {
+                if (!allowed || closed) return;
+                let subs = topics.get(topicName);
+                if (!subs) {
+                  subs = new Set();
+                  topics.set(topicName, subs);
+                }
+                subs.add(conn);
+                conn.subscribedTopics?.add(topicName);
+              })
+              .catch((err) => console.error("[webrtc-signaling] subscribe check failed", err));
           }
           break;
         }
@@ -164,6 +202,10 @@ export function attachWebrtcSignaling(httpServer: HttpServer): void {
         }
         case "publish": {
           if (typeof message.topic !== "string") break;
+          // Only relay to sockets that themselves passed the `canSubscribe`
+          // check above and are tracked as members of this topic -- a
+          // sender that never subscribed (or was denied) gets no fan-out.
+          if (!conn.subscribedTopics?.has(message.topic)) break;
           const receivers = topics.get(message.topic);
           if (!receivers) break;
           message.clients = receivers.size;

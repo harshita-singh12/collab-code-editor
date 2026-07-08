@@ -8,6 +8,7 @@ import { resetDb, closeDb } from "./testDb";
 import { createTestUser } from "./testUsers";
 import { redisBus } from "../src/redis/pubsub";
 import { roomManager } from "../src/rooms/roomManager";
+import { createDocument, updateLinkAccess } from "../src/db/documentsRepo";
 
 /**
  * Exercises the actual WebRTC signaling code
@@ -27,11 +28,34 @@ describe("WebRTC signaling server", () => {
   let baseWsUrl: string;
   let httpServer: ReturnType<typeof createApp>["httpServer"];
   let token: string;
+  let strangerToken: string;
+  let privateDocId: string;
+  // Topics the signaling server accepts a subscribe for must correspond to
+  // a real document `token`'s user can read (see `canSubscribe` in
+  // `signalingServer.ts`) -- these three stand in for the ad-hoc
+  // "collab-doc-room-N" names the tests used before that check existed.
+  let roomOneTopic: string;
+  let roomTwoTopic: string;
+  let roomThreeTopic: string;
 
   beforeAll(async () => {
     await resetDb();
     const owner = await createTestUser("webrtc-owner", "Owner");
     token = signToken({ sub: owner.id, displayName: "Owner" });
+
+    const stranger = await createTestUser("webrtc-stranger", "Stranger");
+    strangerToken = signToken({ sub: stranger.id, displayName: "Stranger" });
+
+    const privateDoc = await createDocument("Private doc", owner.id, "javascript");
+    await updateLinkAccess(privateDoc.id, "none");
+    privateDocId = privateDoc.id;
+
+    const roomOne = await createDocument("Room 1", owner.id, "javascript");
+    const roomTwo = await createDocument("Room 2", owner.id, "javascript");
+    const roomThree = await createDocument("Room 3", owner.id, "javascript");
+    roomOneTopic = `collab-doc-${roomOne.id}`;
+    roomTwoTopic = `collab-doc-${roomTwo.id}`;
+    roomThreeTopic = `collab-doc-${roomThree.id}`;
 
     const created = createApp();
     httpServer = created.httpServer;
@@ -88,12 +112,13 @@ describe("WebRTC signaling server", () => {
     const b = await connect(token);
     const c = await connect(token); // subscribed to a different room entirely
 
-    a.send(JSON.stringify({ type: "subscribe", topics: ["collab-doc-room-1"] }));
-    b.send(JSON.stringify({ type: "subscribe", topics: ["collab-doc-room-1"] }));
-    c.send(JSON.stringify({ type: "subscribe", topics: ["collab-doc-room-2"] }));
+    a.send(JSON.stringify({ type: "subscribe", topics: [roomOneTopic] }));
+    b.send(JSON.stringify({ type: "subscribe", topics: [roomOneTopic] }));
+    c.send(JSON.stringify({ type: "subscribe", topics: [roomTwoTopic] }));
 
-    // Give the subscriptions a moment to land server-side before publishing.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Give the subscriptions a moment to land server-side before publishing
+    // (subscribe now round-trips through an async access-control check).
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     const bReceived = nextMessage(b);
     const cReceivedOrTimeout = Promise.race([
@@ -104,14 +129,14 @@ describe("WebRTC signaling server", () => {
     a.send(
       JSON.stringify({
         type: "publish",
-        topic: "collab-doc-room-1",
+        topic: roomOneTopic,
         data: { signal: "offer-from-a" },
       })
     );
 
     const received = await bReceived;
     expect(received.type).toBe("publish");
-    expect(received.topic).toBe("collab-doc-room-1");
+    expect(received.topic).toBe(roomOneTopic);
     expect(received.data.signal).toBe("offer-from-a");
     expect(received.clients).toBe(2); // a and b are both subscribed
 
@@ -127,24 +152,56 @@ describe("WebRTC signaling server", () => {
     const a = await connect(token);
     const b = await connect(token);
 
-    a.send(JSON.stringify({ type: "subscribe", topics: ["collab-doc-room-3"] }));
-    b.send(JSON.stringify({ type: "subscribe", topics: ["collab-doc-room-3"] }));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    a.send(JSON.stringify({ type: "subscribe", topics: [roomThreeTopic] }));
+    b.send(JSON.stringify({ type: "subscribe", topics: [roomThreeTopic] }));
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
-    b.send(JSON.stringify({ type: "unsubscribe", topics: ["collab-doc-room-3"] }));
+    b.send(JSON.stringify({ type: "unsubscribe", topics: [roomThreeTopic] }));
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const bReceivedOrTimeout = Promise.race([
       nextMessage(b).then(() => "message" as const),
       new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 200)),
     ]);
-    a.send(JSON.stringify({ type: "publish", topic: "collab-doc-room-3", data: {} }));
+    a.send(JSON.stringify({ type: "publish", topic: roomThreeTopic, data: {} }));
 
     expect(await bReceivedOrTimeout).toBe("timeout");
 
     a.close();
     b.close();
     await Promise.all([waitClose(a), waitClose(b)]);
+  });
+
+  it("does not relay to a subscriber who lacks access to the document behind the topic", async () => {
+    // Regression test: the signaling server used to only check that the
+    // connecting JWT was *valid*, not that its user could actually read the
+    // specific document the topic name encodes. Since WebRTC sync traffic
+    // flows directly between peers once connected (bypassing roomManager's
+    // access-control enforcement entirely), that let any authenticated user
+    // pull down a private document's content over WebRTC despite failing
+    // `resolveEffectiveRole` on the REST/Socket.io path.
+    const owner = await connect(token);
+    const stranger = await connect(strangerToken);
+    const topic = `collab-doc-${privateDocId}`;
+
+    owner.send(JSON.stringify({ type: "subscribe", topics: [topic] }));
+    stranger.send(JSON.stringify({ type: "subscribe", topics: [topic] }));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const strangerReceivedOrTimeout = Promise.race([
+      nextMessage(stranger).then(() => "message" as const),
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 200)),
+    ]);
+
+    owner.send(
+      JSON.stringify({ type: "publish", topic, data: { signal: "offer-from-owner" } })
+    );
+
+    expect(await strangerReceivedOrTimeout).toBe("timeout");
+
+    owner.close();
+    stranger.close();
+    await Promise.all([waitClose(owner), waitClose(stranger)]);
   });
 
   it("responds to a ping with a pong", async () => {
