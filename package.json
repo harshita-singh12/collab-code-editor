@@ -11,8 +11,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/ot-demo && npm run build --workspace=packages/client",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run build --workspace=packages/shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build --workspace=packages/shared && npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:client": "npm run dev --workspace=packages/client",
