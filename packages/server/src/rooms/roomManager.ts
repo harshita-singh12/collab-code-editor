@@ -419,6 +419,20 @@ class RoomManager {
     const room = this.rooms.get(docId);
     if (!room) return;
     await this.persistNow(room);
+    // Mirror image of the `pendingCreates` race guarded against in
+    // `getOrLoad`: `persistNow` above just awaited a DB round-trip, and a
+    // new socket may have joined this exact room while that was in
+    // flight (`join` -> `getOrLoad` finds this room still in `this.rooms`
+    // and registers against it). If that happened, the room is no longer
+    // idle and must not be torn down out from under the socket that just
+    // joined it -- that socket would otherwise be left registered against
+    // a `Room` object whose doc/awareness we just destroyed and which is
+    // no longer reachable via `this.rooms`, silently orphaning it (it
+    // would stop receiving/sending sync until it disconnects and
+    // reconnects). Everything from here on is synchronous, so this check
+    // is race-free: nothing else can touch `room.sockets` before we
+    // either bail out or finish deleting the map entry below.
+    if (room.sockets.size > 0) return;
     if (room.persistTimer) clearTimeout(room.persistTimer);
     if (room.maxPersistTimer) clearTimeout(room.maxPersistTimer);
     if (room.checkpointTimer) clearTimeout(room.checkpointTimer);
