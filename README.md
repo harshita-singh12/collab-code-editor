@@ -446,11 +446,9 @@ remains an intentional, still-current scope decision:
   what it would take. It is not wired into the main app.
 - `npm audit` reports a handful of moderate/high/critical advisories, all
   in dev tooling (`vite`/`vitest`/`esbuild`'s dev-server and its bundled
-  mocker, and `uuid`'s buffer-based APIs which this repo never calls --
-  only `uuid.v4()` is used). Not patched via `--force` because the
-  available fixes are breaking major version bumps of
-  `vite`/`vitest`/`uuid` that weren't worth the regression risk for a
-  local dev-tooling-only exposure.
+  mocker). Not patched via `--force` because the available fixes are
+  breaking major version bumps of `vite`/`vitest` that weren't worth the
+  regression risk for a local dev-tooling-only exposure.
 
 ## Environment variables
 

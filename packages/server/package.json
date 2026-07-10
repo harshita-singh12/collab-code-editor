@@ -26,7 +26,6 @@
     "lib0": "^0.2.94",
     "pg": "^8.12.0",
     "socket.io": "^4.7.5",
-    "uuid": "^9.0.1",
     "ws": "^8.18.0",
     "y-protocols": "^1.0.6",
     "yjs": "^13.6.18"
@@ -38,7 +37,6 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.2",
     "@types/pg": "^8.11.6",
-    "@types/uuid": "^9.0.8",
     "@types/supertest": "^6.0.2",
     "@types/ws": "^8.5.12",
     "node-datachannel": "^0.32.3",
