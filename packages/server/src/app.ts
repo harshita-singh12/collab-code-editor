@@ -23,6 +23,19 @@ export function createApp(): { app: express.Express; httpServer: HttpServer; io:
   app.use("/api/documents", versionsRouter);
   app.use("/api/users", usersRouter);
 
+  // Catch-all error handler: every route above is wrapped in asyncHandler
+  // (see util/asyncHandler.ts) so a rejected promise ends up here via
+  // `next(err)` instead of becoming an unhandled rejection that would take
+  // the whole process down (e.g. a malformed UUID in a path param makes
+  // Postgres reject the query). Must be registered last and take exactly
+  // four params for Express to recognize it as an error handler.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[server] unhandled request error", err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: "internal server error" });
+  });
+
   const httpServer = createServer(app);
   const io = new SocketIOServer(httpServer, {
     cors: { origin: env.CORS_ORIGIN, credentials: true },

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db/pool";
 import { requireAuth } from "../auth/middleware";
+import { asyncHandler } from "../util/asyncHandler";
 
 export const usersRouter = Router();
 
@@ -8,16 +9,20 @@ export const usersRouter = Router();
  * Scoped to requireAuth just so this isn't a fully open, unauthenticated
  * user enumeration endpoint; it still only searches display names, never
  * emails, to avoid leaking account emails through the share dialog. */
-usersRouter.get("/", requireAuth, async (req, res) => {
-  const query = String(req.query.q ?? "").trim();
-  if (query.length < 2) {
-    res.json([]);
-    return;
-  }
-  const result = await pool.query(
-    `SELECT id, display_name AS "displayName", color
-     FROM users WHERE display_name ILIKE $1 LIMIT 10`,
-    [`%${query}%`]
-  );
-  res.json(result.rows);
-});
+usersRouter.get(
+  "/",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const query = String(req.query.q ?? "").trim();
+    if (query.length < 2) {
+      res.json([]);
+      return;
+    }
+    const result = await pool.query(
+      `SELECT id, display_name AS "displayName", color
+       FROM users WHERE display_name ILIKE $1 LIMIT 10`,
+      [`%${query}%`]
+    );
+    res.json(result.rows);
+  })
+);

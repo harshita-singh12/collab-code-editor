@@ -10,6 +10,7 @@ import {
 } from "../db/snapshotsRepo";
 import { getUserById } from "../db/usersRepo";
 import { roomManager } from "../rooms/roomManager";
+import { asyncHandler } from "../util/asyncHandler";
 
 export const versionsRouter = Router();
 
@@ -32,26 +33,29 @@ async function toSummary(row: {
   };
 }
 
-versionsRouter.get("/:id/versions", async (req: AuthedRequest, res) => {
-  const doc = await getDocumentById(req.params.id);
-  if (!doc) {
-    res.status(404).json({ error: "not found" });
-    return;
-  }
-  const role = await resolveEffectiveRole(doc, req.userId ?? null);
-  if (!requireAtLeast(role, "viewer")) {
-    res.status(403).json({ error: "access denied" });
-    return;
-  }
-  const rows = await listSnapshots(doc.id);
-  const summaries = await Promise.all(rows.map(toSummary));
-  res.json(summaries);
-});
+versionsRouter.get(
+  "/:id/versions",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const doc = await getDocumentById(req.params.id);
+    if (!doc) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+    const role = await resolveEffectiveRole(doc, req.userId ?? null);
+    if (!requireAtLeast(role, "viewer")) {
+      res.status(403).json({ error: "access denied" });
+      return;
+    }
+    const rows = await listSnapshots(doc.id);
+    const summaries = await Promise.all(rows.map(toSummary));
+    res.json(summaries);
+  })
+);
 
 versionsRouter.post(
   "/:id/versions",
   requireAuth,
-  async (req: AuthedRequest, res) => {
+  asyncHandler(async (req: AuthedRequest, res) => {
     const doc = await getDocumentById(req.params.id);
     if (!doc) {
       res.status(404).json({ error: "not found" });
@@ -67,12 +71,12 @@ versionsRouter.post(
     const rows = await listSnapshots(doc.id);
     const summaries = await Promise.all(rows.map(toSummary));
     res.status(201).json(summaries[0]);
-  }
+  })
 );
 
 versionsRouter.get(
   "/:id/versions/:versionId",
-  async (req: AuthedRequest, res) => {
+  asyncHandler(async (req: AuthedRequest, res) => {
     const doc = await getDocumentById(req.params.id);
     if (!doc) {
       res.status(404).json({ error: "not found" });
@@ -96,13 +100,13 @@ versionsRouter.get(
       toText: snapshot.text_excerpt,
     };
     res.json(dto);
-  }
+  })
 );
 
 versionsRouter.post(
   "/:id/versions/:versionId/restore",
   requireAuth,
-  async (req: AuthedRequest, res) => {
+  asyncHandler(async (req: AuthedRequest, res) => {
     const doc = await getDocumentById(req.params.id);
     if (!doc) {
       res.status(404).json({ error: "not found" });
@@ -120,7 +124,7 @@ versionsRouter.post(
     }
     await roomManager.restoreToText(doc.id, snapshot.text_excerpt, req.userId!);
     res.json({ ok: true });
-  }
+  })
 );
 
 /** Ad-hoc diff between the live document and any historical version --
@@ -128,7 +132,7 @@ versionsRouter.post(
  * commits to POST .../restore. */
 versionsRouter.get(
   "/:id/versions/:versionId/diff-with-current",
-  async (req: AuthedRequest, res) => {
+  asyncHandler(async (req: AuthedRequest, res) => {
     const doc = await getDocumentById(req.params.id);
     if (!doc) {
       res.status(404).json({ error: "not found" });
@@ -149,5 +153,5 @@ versionsRouter.get(
       fromText: snapshot.text_excerpt,
       toText: currentText,
     });
-  }
+  })
 );
