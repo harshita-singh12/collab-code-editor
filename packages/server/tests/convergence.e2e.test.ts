@@ -146,4 +146,30 @@ describe("convergence under network partition (e2e, real Socket.io)", () => {
     expect(a.text()).toBe(b.text());
     expect([...a.text()].sort().join("")).toBe("12345");
   });
+
+  it("survives a malformed doc-sync/doc-awareness payload instead of taking the room down", async () => {
+    // Regression test: RoomManager.handleSyncMessage/handleAwarenessMessage
+    // used to have nothing catching the synchronous throw lib0/y-protocols
+    // raise on a garbage buffer (bad message-type tag, truncated length
+    // prefix, etc). Since this test suite runs the server in-process, an
+    // uncaught throw here wouldn't just fail an assertion -- it would crash
+    // the whole vitest worker before it ever ran expect(). If this test
+    // passes at all, the fix held.
+    const { doc, token } = await makeDocument();
+    const a = client(doc.id, token);
+    const b = client(doc.id, token);
+    await Promise.all([a.connectAndJoin(), b.connectAndJoin()]);
+
+    const garbage = new Uint8Array([255, 255, 255, 255, 255, 1, 2, 3]);
+    a.socket.emit("doc-sync", garbage);
+    a.socket.emit("doc-awareness", garbage);
+    a.socket.emit("doc-sync", new Uint8Array());
+
+    // The room must still be alive and fully functional afterwards: a real
+    // edit from either client still reaches the other.
+    a.insert(0, "still alive");
+    await waitUntil(() => b.text() === "still alive");
+    expect(a.socket.connected).toBe(true);
+    expect(b.text()).toBe("still alive");
+  });
 });
