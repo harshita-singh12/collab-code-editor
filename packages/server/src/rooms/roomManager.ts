@@ -183,29 +183,47 @@ class RoomManager {
     const entry = room.sockets.get(socket.id);
     if (!entry) return;
 
-    if (entry.role === "viewer") {
-      // A viewer may still request/receive sync (messageYjsSyncStep1) but
-      // may not push updates. Peek the message type without mutating doc
-      // state for anything other than step1 requests.
-      const peekDecoder = decoding.createDecoder(data);
-      const messageType = decoding.readVarUint(peekDecoder);
-      if (messageType !== syncProtocol.messageYjsSyncStep1) {
-        return; // silently drop step2/update from a read-only client
+    // A client-controlled byte payload reaches decoders (lib0/y-protocols)
+    // that throw synchronously on anything malformed (truncated buffers,
+    // bogus message-type tags, etc). Since this runs inside a plain
+    // Socket.io event listener, an uncaught throw here would propagate all
+    // the way up and crash the whole process -- taking down every room for
+    // every connected client, not just the sender. Treat a malformed
+    // payload as "drop it and log", the same way we already treat a
+    // disallowed write from a viewer.
+    try {
+      if (entry.role === "viewer") {
+        // A viewer may still request/receive sync (messageYjsSyncStep1) but
+        // may not push updates. Peek the message type without mutating doc
+        // state for anything other than step1 requests.
+        const peekDecoder = decoding.createDecoder(data);
+        const messageType = decoding.readVarUint(peekDecoder);
+        if (messageType !== syncProtocol.messageYjsSyncStep1) {
+          return; // silently drop step2/update from a read-only client
+        }
       }
-    }
 
-    const decoder = decoding.createDecoder(data);
-    const encoder = encoding.createEncoder();
-    syncProtocol.readSyncMessage(decoder, encoder, room.doc, socket.id);
-    if (encoding.length(encoder) > 0) {
-      socket.emit(SOCKET_EVENTS.DOC_SYNC, encoding.toUint8Array(encoder));
+      const decoder = decoding.createDecoder(data);
+      const encoder = encoding.createEncoder();
+      syncProtocol.readSyncMessage(decoder, encoder, room.doc, socket.id);
+      if (encoding.length(encoder) > 0) {
+        socket.emit(SOCKET_EVENTS.DOC_SYNC, encoding.toUint8Array(encoder));
+      }
+    } catch (err) {
+      console.error(`[room ${docId}] dropped malformed doc-sync payload from ${socket.id}`, err);
     }
   }
 
   handleAwarenessMessage(docId: string, socket: Socket, data: Uint8Array): void {
     const room = this.rooms.get(docId);
     if (!room) return;
-    applyAwarenessUpdate(room.awareness, data, socket.id);
+    // Same reasoning as handleSyncMessage above: never let a malformed
+    // client payload throw past this point.
+    try {
+      applyAwarenessUpdate(room.awareness, data, socket.id);
+    } catch (err) {
+      console.error(`[room ${docId}] dropped malformed awareness payload from ${socket.id}`, err);
+    }
   }
 
   handleDisconnectCleanup(docId: string, socket: Socket): void {
